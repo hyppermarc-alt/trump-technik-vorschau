@@ -20,6 +20,58 @@
     addEventListener('keydown', (e) => { if (e.key === 'Escape' && header.classList.contains('is-open')) { set(false); btn.focus(); } });
   }
 
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* Überschriften in Wörter teilen, damit sie einzeln einfahren können */
+  const splitWords = (node, counter) => {
+    [...node.childNodes].forEach((n) => {
+      if (n.nodeType === 3) {
+        const parts = n.textContent.split(/(\s+)/);
+        const frag = document.createDocumentFragment();
+        parts.forEach((p) => {
+          if (!p) return;
+          if (/^\s+$/.test(p)) { frag.appendChild(document.createTextNode(p)); return; }
+          const w = document.createElement('span'); w.className = 'w';
+          const inner = document.createElement('span'); inner.textContent = p; inner.style.setProperty('--i', counter.i++);
+          w.appendChild(inner); frag.appendChild(w);
+        });
+        n.replaceWith(frag);
+      } else if (n.nodeType === 1 && !n.classList.contains('sr-only') && !n.classList.contains('rotator') && n.tagName !== 'BR') splitWords(n, counter);
+    });
+  };
+  const splits = $$('[data-split]');
+  splits.forEach((h) => { splitWords(h, { i: 0 }); h.classList.add('is-split'); h.setAttribute('data-reveal', ''); h.style.setProperty('opacity', '1'); h.style.setProperty('transform', 'none'); });
+
+  /* Hero: wechselndes Wort */
+  const rot = $('.rotator');
+  if (rot && !reduce) {
+    const words = [...rot.children]; let k = 0;
+    setInterval(() => {
+      if (document.hidden) return;
+      const cur = words[k]; k = (k + 1) % words.length; const next = words[k];
+      cur.classList.remove('is-on'); cur.classList.add('is-out');
+      next.classList.remove('is-out'); next.classList.add('is-on');
+      setTimeout(() => cur.classList.remove('is-out'), 650);
+    }, 2400);
+  }
+
+  /* Outline-Schriftzüge wandern langsam mit dem Scrollen */
+  const marks = $$('.watermark');
+  if (marks.length && !reduce) {
+    let ticking = false;
+    const move = () => {
+      ticking = false;
+      marks.forEach((m) => {
+        const r = m.parentElement.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > innerHeight) return;
+        const p = (innerHeight - r.top) / (innerHeight + r.height);
+        m.style.transform = `translate3d(${(-p * 22 + 4).toFixed(2)}%, 0, 0)`;
+      });
+    };
+    addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(move); } }, { passive: true });
+    move();
+  }
+
   /* Einblenden beim Scrollen, nie dauerhaft versteckt */
   const reveal = $$('[data-reveal]');
   if ('IntersectionObserver' in window) {
